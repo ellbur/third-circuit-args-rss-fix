@@ -5,6 +5,7 @@ import { ca } from './ca.mjs';
 import axios from 'axios';
 import https from 'https';
 import html from 'node-html-parser';
+import xml2js from 'xml2js';
 
 axios.get(
   'https://www2.ca3.uscourts.gov/oralargument/ListArguments30.aspx',
@@ -12,8 +13,20 @@ axios.get(
     httpsAgent: new https.Agent({ca: ca})
   }
 ).then(resp => {
+  const outItems = [ ];
+  const outDoc = {
+    rss: {
+      $: {
+        version: "2.0"
+      },
+      channel: {
+        description: "Third Circuit oral arguments",
+        item: outItems
+      }
+    }
+  };
+  
   const body = html.parse(resp.data);
-  console.log(resp.data);
   const grid = body.getElementById('GridArguments');
   for (const tr of grid.querySelectorAll('tr')) {
     const tds = tr.querySelectorAll('td');
@@ -31,9 +44,16 @@ axios.get(
         parseInt(dateMatch[1]) - 1,
         parseInt(dateMatch[2])
       );
-      console.log(td1.text, td2.text, date, argURL.href);
+      outItems.push({
+        title: fileName,
+        link: argURL.href,
+        pubDate: date.toUTCString()
+      });
     }
   }
+  
+  const builder = new xml2js.Builder();
+  console.log(builder.buildObject(outDoc));
 }).catch(error => {
   console.log('error', error);
 });
